@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣宅配通｜裝載與派車模擬系統</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        :root {
+            --primary: #1E3A8A; /* 宅配通深藍 */
+            --bg: #F8FAFC; --card-bg: #FFFFFF; --border: #E2E8F0;
+            --accent: #F59E0B; /* 宅配通黃 */
+            --success: #10B981; --warning-bg: #FFFBEB; 
+            --warning-border: #FDE68A; --warning-text: #92400E; --text-main: #334155;
+            --color-s60: #3B82F6; --color-s90: #10B981; --color-s120: #F59E0B; --color-s150: #EF4444;
+            transition: all 0.5s ease;
+        }
+        body.golden-theme {
+            --primary: #D97706;
+            --bg: #111827; --card-bg: #1F2937; --text-main: #F3F4F6;
+            --border: #374151; --accent: #FBBF24; --warning-bg: #451A03;
+        }
+        body.golden-theme .card, body.golden-theme .result-box, body.golden-theme .radio-card, body.golden-theme #custom-mix-options { background: #374151; color: #F3F4F6; }
+        body.golden-theme .card-title, body.golden-theme .radio-content b { color: #FBBF24; }
+        body.golden-theme .input-row, body.golden-theme .chk-label { background: #1F2937; border-color: #4B5563; }
+        body.golden-theme .list-item, body.golden-theme .truck-item, body.golden-theme .stat-card { background: #1F2937; color: #E5E7EB; border-color: #4B5563;}
+
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: var(--card-bg); padding: 30px 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 950px; border-top: 6px solid var(--accent); }
+        
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border); position: relative; }
+        .header h2 { margin: 0; font-size: 1.8rem; color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 10px; }
+        
+        .toolbar { display: flex; gap: 10px; justify-content: flex-end; margin-bottom: 20px; flex-wrap: wrap;}
+        .btn-small { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 0.95rem; transition: 0.2s; display: flex; align-items: center; gap: 6px; font-weight: 600; color: #475569; }
+        .btn-small:hover { background: #F1F5F9; color: var(--primary); border-color: #CBD5E1; }
+        
+        .strategy-container { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+        .strategy-title { margin: 0 0 15px 0; font-size: 1.1rem; color: var(--primary); display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        .radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 15px; }
+        .radio-card { display: flex; align-items: flex-start; gap: 10px; border: 2px solid var(--border); padding: 15px; border-radius: 10px; cursor: pointer; background: white; transition: 0.2s; position: relative;}
+        .radio-card:hover { border-color: var(--accent); }
+        .radio-card input[type="radio"] { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+        .radio-content b { display: block; font-size: 1.05rem; color: #1E293B; margin-bottom: 6px; }
+        .radio-content span { font-size: 0.85rem; color: #64748B; line-height: 1.5; display: block; }
+        input[type="radio"]:checked + .radio-content b { color: var(--primary); }
+        
+        #custom-mix-options { display: none; margin-top: 15px; padding: 15px; background: white; border: 1px dashed var(--accent); border-radius: 8px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .chk-group { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
+        .chk-label { display: flex; align-items: center; gap: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; background: #F1F5F9; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); transition: 0.2s;}
+        .chk-label:hover { background: #E2E8F0; }
+        .chk-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: #FFF; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .card-title { font-weight: 700; font-size: 1.1rem; margin: 0 0 5px 0; color: #1E293B; display: flex; align-items: center; gap: 8px;}
+        .card-desc { font-size: 0.85rem; color: #64748B; margin: 0 0 10px 0; }
+        .color-dot { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+        .input-row { display: flex; align-items: center; background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+        .input-row label { font-size: 0.9rem; font-weight: 600; color: #475569; padding-right: 8px; border-right: 1px solid var(--border); }
+        .input-row input { width: 100%; padding: 8px; border: none; background: transparent; font-size: 1.1rem; text-align: right; color: var(--primary); font-weight: 600; outline: none; }
+
+        .weight-input-container { background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 12px; padding: 20px 25px; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
+        .weight-text h3 { margin: 0 0 8px 0; color: var(--warning-text); display: flex; align-items: center; gap: 8px; font-size: 1.2rem; }
+        .weight-text p { margin: 0; color: #B45309; font-size: 0.95rem; line-height: 1.5; }
+        .weight-field { display: flex; align-items: center; background: white; border: 1px solid #FCD34D; border-radius: 8px; overflow: hidden; }
+        .weight-field input { border: none; padding: 12px; font-size: 1.2rem; width: 140px; outline: none; text-align: right; color: var(--warning-text); font-weight: bold; }
+        .weight-field .unit { background: #FEF3C7; padding: 12px; color: var(--warning-text); font-weight: bold; border-left: 1px solid #FCD34D; }
+
+        .btn-calc { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: 0.2s; border-bottom: 4px solid #172554;}
+        .btn-calc:hover { background: #1E40AF; transform: translateY(1px); border-bottom-width: 3px; }
+
+        #resultArea { margin-top: 30px; display: none; }
+        .result-box { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 20px; }
+        .result-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        
+        .color-legend { display: flex; gap: 15px; font-size: 0.9rem; font-weight: 600; color: #475569; background: #F1F5F9; padding: 8px 15px; border-radius: 8px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #F8FAFC; border: 1px solid var(--border); padding: 15px; border-radius: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .stat-value { font-size: 1.6rem; font-weight: bold; color: var(--primary); margin-bottom: 4px; }
+        .stat-label { font-size: 0.85rem; color: #64748B; font-weight: 500; }
+
+        .list-group { list-style: none; padding: 0; margin: 0; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px dashed var(--border); font-size: 1.05rem; }
+        .list-item:last-child { border: none; padding-bottom: 0; }
+        
+        .truck-item { flex-direction: column; align-items: flex-start; gap: 10px; background: #F8FAFC; padding: 15px; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 10px; }
+        .truck-header { display: flex; justify-content: space-between; width: 100%; align-items: center; }
+        .truck-name { font-weight: bold; color: #1E293B; display: flex; align-items: center; gap: 8px; }
+        .truck-cages { font-size: 1.1rem; color: var(--success); font-weight: bold; }
+        .progress-bar-bg { width: 100%; background: #E2E8F0; border-radius: 6px; height: 10px; overflow: hidden; }
+        .progress-bar-fill { background: var(--accent); height: 100%; transition: width 0.5s ease; }
+        .progress-bar-fill.full { background: var(--success); }
+        .truck-util { font-size: 0.85rem; color: #64748B; font-weight: 500; width: 100%; display: flex; justify-content: space-between; align-items: center;}
+        
+        .btn-3d { background: #EEF2FF; color: var(--primary); border: 1px solid #C7D2FE; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .btn-3d:hover { background: #E0E7FF; }
+        .btn-3d.truck { background: #FEF3C7; color: #B45309; border-color: #FDE68A; }
+        .btn-3d.truck:hover { background: #FDE68A; }
+
+        .highlight-cost { display: flex; justify-content: flex-end; align-items: center; background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; padding: 18px; border-radius: 10px; font-size: 1.4rem; font-weight: bold; margin-top: 20px; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 20px; border-radius: 16px; width: 95%; max-width: 1100px; height: 85vh; display: flex; flex-direction: column; position: relative;}
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-header h3 { margin: 0; font-size: 1.3rem; color: var(--primary); }
+        .btn-close { background: #F1F5F9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; }
+        .btn-close:hover { background: #E2E8F0; }
+        
+        .canvas-container { flex: 1; position: relative; border-radius: 8px; overflow: hidden; background: #F8FAFC; border: 1px inset var(--border); margin-bottom: 15px; }
+        #canvas3d { width: 100%; height: 100%; }
+        
+        .hud-dimensions { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 15px 20px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.08); pointer-events: none; z-index: 10; }
+        .hud-dimensions h4 { margin: 0 0 10px 0; font-size: 1.05rem; color: var(--primary); border-bottom: 2px solid var(--accent); padding-bottom: 6px;}
+        .hud-dimensions p { margin: 6px 0; font-size: 0.95rem; color: #334155; font-weight: bold; }
+        .hud-dimensions span { color: #64748B; font-weight: normal; font-size: 0.85rem;}
+
+        .hud-controls { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 10;}
+        .btn-door-toggle { background: var(--primary); color: white; border: none; padding: 12px 20px; font-size: 1.05rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(30,58,138,0.3); transition: 0.2s; display: flex; align-items: center; gap: 8px;}
+        .btn-door-toggle:hover { background: #172554; transform: translateY(-2px); }
+
+        .controls-hint { text-align: center; font-size: 0.85rem; color: #64748B; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+        /* 彩蛋圖鑑視窗專用樣式 */
+        #modalManual .modal-content { height: auto; max-width: 650px; background: #1E293B; color: #F8FAFC; border-left: 6px solid #F43F5E; }
+        #modalManual h3 { color: #F43F5E; margin: 0; display: flex; align-items: center; gap: 8px;}
+        #modalManual ul { padding-left: 20px; margin: 0; line-height: 1.8; }
+        #modalManual li span { background: #334155; padding: 2px 8px; border-radius: 4px; color: #FBBF24; font-family: monospace; font-size: 0.9rem;}
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; padding: 0; border: none; }
+            .no-print { display: none !important; }
+            #resultArea { display: block !important; margin-top: 0; }
+            .result-box { border: 2px solid #000; break-inside: avoid; margin-bottom: 30px; }
+            .stat-card { border: 1px solid #000; background: transparent; }
+            .truck-item { border: 1px solid #CCC; background: transparent; }
+            .progress-bar-bg { border: 1px solid #94A3B8; }
+            .highlight-cost { border: 2px solid #000; background: transparent; color: #000; }
+            * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h2>📦 台灣宅配通｜裝載與派車模擬系統</h2>
+        </div>
+
+        <div class="toolbar no-print">
+            <button class="btn-small" onclick="document.getElementById('modalManual').style.display='flex'" style="color:#F43F5E; border-color:#FDA4AF; background: #FFF1F2;">🎮 隱藏彩蛋圖鑑</button>
+            <button class="btn-small" onclick="resetForm()">🗑 一鍵清空重填</button>
+        </div>
+
+        <div class="strategy-container no-print">
+            <h3 class="strategy-title">⚙ 裝箱策略選擇</h3>
+            <div class="radio-group">
+                <label class="radio-card" onclick="highlightRadio(this, 'standard')">
+                    <input type="radio" name="pack_strategy" value="standard" checked>
+                    <div class="radio-content">
+                        <b>🚀 現場效率優先 (純貨+零星)</b>
+                        <span>優先裝滿純籠，剩餘零星才混裝。優點：現場理貨最快。</span>
+                    </div>
+                </label>
+                <label class="radio-card" onclick="highlightRadio(this, 'global')">
+                    <input type="radio" name="pack_strategy" value="global">
+                    <div class="radio-content">
+                        <b>🧩 全局包裹混裝 (空間優先)</b>
+                        <span>所有包裹一起試排，優先填補空位；不保證籠數或運費最少。</span>
+                    </div>
+                </label>
+                <label class="radio-card" onclick="highlightRadio(this, 'custom')">
+                    <input type="radio" name="pack_strategy" value="custom">
+                    <div class="radio-content">
+                        <b>🎯 指定包裹混裝 (空間優先)</b>
+                        <span>僅允許您勾選的包裹進行混裝，未勾選的包裹強制獨立裝籠。</span>
+                    </div>
+                </label>
+            </div>
+
+            <div id="custom-mix-options">
+                <p style="margin:0 0 5px 0; color:var(--primary); font-weight:bold;">☑️ 請勾選允許參與「混裝」的包裹尺寸：</p>
+                <p style="margin:0 0 10px 0; color:#64748B; font-size:0.85rem;">未勾選的尺寸將強制獨立裝籠（包含餘數），絕不與其他貨物混疊。</p>
+                <div class="chk-group">
+                    <label class="chk-label"><input type="checkbox" id="chk_s60" checked><span class="color-dot" style="background:var(--color-s60);"></span> S60</label>
+                    <label class="chk-label"><input type="checkbox" id="chk_s90" checked><span class="color-dot" style="background:var(--color-s90);"></span> S90</label>
+                    <label class="chk-label"><input type="checkbox" id="chk_s120" checked><span class="color-dot" style="background:var(--color-s120);"></span> S120</label>
+                    <label class="chk-label"><input type="checkbox" id="chk_s150" checked><span class="color-dot" style="background:var(--color-s150);"></span> S150</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-cards no-print">
+            <script>
+                const sizeData = [
+                    { id: 's60', name: 'S60 規格', desc: '25 × 20 × 10 cm', color: 'var(--color-s60)' },
+                    { id: 's90', name: 'S90 規格', desc: '35 × 25 × 20 cm', color: 'var(--color-s90)' },
+                    { id: 's120', name: 'S120 規格', desc: '45 × 35 × 30 cm', color: 'var(--color-s120)' },
+                    { id: 's150', name: 'S150 規格', desc: '60 × 40 × 40 cm', color: 'var(--color-s150)' }
+                ];
+                sizeData.forEach(s => {
+                    document.write(`
+                        <div class="card">
+                            <h3 class="card-title"><span class="color-dot" style="background:${s.color};"></span> ${s.name}</h3>
+                            <p class="card-desc">${s.desc}</p>
+                            <div class="input-row">
+                                <label>件數</label>
+                                <input type="number" id="qty_${s.id}" min="0" value="0" oninput="checkEasterEgg9999(this)">
+                            </div>
+                        </div>
+                    `);
+                });
+            </script>
+        </div>
+
+        <div class="weight-input-container no-print">
+            <div class="weight-text">
+                <h3>⚖ 整批包裹總淨重 <span style="font-size:0.8rem; background:#FDE68A; padding:2px 8px; border-radius:10px;">選填</span></h3>
+                <p>輸入總重進行防超載把關。系統會自動加上 <b>空籠車重 (預設 45kg/台)</b> 算出總噸數。</p>
+            </div>
+            <div class="weight-field">
+                <input type="number" id="total_weight_input" min="0" placeholder="例如: 2500">
+                <span class="unit">公斤 (kg)</span>
+            </div>
+        </div>
+
+        <button class="btn-calc no-print" onclick="processCalculation()" id="calcBtn">🚀 開始極速運算建議派車配置</button>
+
+        <p class="stacking-note" style="font-size:0.9rem;color:#64748b;line-height:1.6">空間模擬：優先填低處、箱底完整支撐，同尺寸盡量對齊。未模擬承壓、重心或防倒固定；裝得進去不代表開門後穩固。全局混裝為啟發式估算，不保證最少籠數。</p><div id="resultArea">
+            <div class="toolbar no-print" style="margin-top: 10px;">
+                <button class="btn-small" style="background: var(--primary); color: white; border:none;" onclick="window.print()">🖨 列印派車單</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-header">
+                    <span>📊 籠車裝載明細</span>
+                    <div class="color-legend">
+                        <div class="legend-item"><span class="color-dot" style="background:var(--color-s60);"></span>S60</div>
+                        <div class="legend-item"><span class="color-dot" style="background:var(--color-s90);"></span>S90</div>
+                        <div class="legend-item"><span class="color-dot" style="background:var(--color-s120);"></span>S120</div>
+                        <div class="legend-item"><span class="color-dot" style="background:var(--color-s150);"></span>S150</div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="resTotalCages">0 台</div>
+                        <div class="stat-label">所需籠車總數</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #DC2626;" id="resTotalWeightLabel">未提供</div>
+                        <div class="stat-label">估算總載重 (含空籠重)</div>
+                    </div>
+                </div>
+                <ul class="list-group" id="cageDetailsList"></ul>
+            </div>
+
+            <div class="result-box" style="border-top: 4px solid var(--success);">
+                <div class="result-header">
+                    <span>🚛 宅配通建議派車配置 (單車空間分析)</span>
+                </div>
+                <ul class="list-group" id="truckDetailsList" style="padding-top:10px;"></ul>
+                
+                <div class="highlight-cost">
+                    <span id="resTotalCost">預估總運費：$0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🌟 新增的隱藏彩蛋說明書 Modal -->
+    <div id="modalManual" class="modal-overlay no-print">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎮 終極隱藏彩蛋圖鑑</h3>
+                <button class="btn-close" onclick="document.getElementById('modalManual').style.display='none'" style="background:transparent; color:#FFF;">✖</button>
+            </div>
+            <ul>
+                <li><b>📦 夢幻盲盒 (隨機)：</b> 運算包裹時有 <code>3%</code> 機率生成含有「PS5」或「內有惡犬」文字的特殊包裹，請旋轉3D視角仔細找找！</li>
+                <li><b>🔊 精準行車語音 (互動)：</b> 進入車廂透視畫面，點擊 <code>左側輪胎</code> 會播報「車輛左轉」，點擊 <code>右側輪胎</code> 播報「車輛右轉」，點擊 <code>車尾液壓門</code> 則播報「倒車，請注意」。</li>
+                <li><b>⚠️ 動態三角錐 (動畫)：</b> 貨車模式下，當您點擊按鈕「打開液壓尾門」時，車尾地板會自動放置兩個紅色三角錐警示，關門時自動收起！</li>
+                <li><b>🚚 引擎發車 (終極彩蛋)：</b> 連續點擊車廂側邊 <code>pelican 宅配通</code> 字樣 3 次，會觸發發車語音，車門強制關閉，隨後整台車會旋轉輪胎並<b>直接向前駛離畫面！</b></li>
+                <li><b>💥 物理崩塌山崩 (互動)：</b> 在 3D 畫面中，對準任意 <code>包裹 (或是車內的籠車)</code> <b>連續點擊 3 下</b>，就會觸發貨物向外推擠倒塌的物理效果！</li>
+                <li><b>🤯 老闆哭了 (防呆)：</b> 試著在件數欄位輸入 <code>9999</code> 看看會發生什麼事。</li>
+                <li><b>⌨️ 柯納米金手指 (密碼)：</b> 網頁任意處，依序敲擊鍵盤 <span>上</span><span>上</span><span>下</span><span>下</span><span>左</span><span>右</span><span>左</span><span>右</span><span>B</span><span>A</span>，解鎖「賽博黃金VIP車隊」。</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 3D 互動視窗 -->
+    <div id="modal3d" class="modal-overlay no-print">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">3D 空間配置預覽</h3>
+                <button class="btn-close" onclick="close3D()">✖</button>
+            </div>
+            
+            <div class="canvas-container">
+                <div class="hud-dimensions">
+                    <h4 id="hudDimTitle">📐 內部空間規格</h4>
+                    <p id="hudDimX">X 寬度：110 cm <span>(門口處)</span></p>
+                    <p id="hudDimZ">Z 深度：80 cm</p>
+                    <p id="hudDimY">Y 高度：170 cm</p>
+                </div>
+                
+                <div id="canvas3d"></div>
+                
+                <div class="hud-controls">
+                    <button class="btn-door-toggle" id="btnToggleDoor" onclick="toggleDoor()">
+                        🚪 打開液壓尾門與車門
+                    </button>
+                </div>
+            </div>
+
+            <div class="controls-hint">
+                <div class="color-legend" id="hudLegend" style="background:transparent; padding:0;">
+                    <div class="legend-item"><span class="color-dot" style="background:var(--color-s60);"></span>S60</div>
+                    <div class="legend-item"><span class="color-dot" style="background:var(--color-s90);"></span>S90</div>
+                    <div class="legend-item"><span class="color-dot" style="background:var(--color-s120);"></span>S120</div>
+                    <div class="legend-item"><span class="color-dot" style="background:var(--color-s150);"></span>S150</div>
+                </div>
+                <span>💡 滑鼠左鍵：旋轉 ｜ 右鍵：平移 ｜ 滾輪：縮放 ｜ 點擊物件：觸發彩蛋</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function highlightRadio(element, mode) {
+            document.querySelectorAll('.radio-card').forEach(card => card.style.borderColor = "var(--border)");
+            element.style.borderColor = "var(--accent)";
+            document.getElementById('custom-mix-options').style.display = (mode === 'custom') ? 'block' : 'none';
+        }
+        document.querySelectorAll('.radio-card')[0].style.borderColor = "var(--accent)";
+
+        function resetForm() {
+            ['s60','s90','s120','s150'].forEach(s => { document.getElementById(`qty_${s}`).value = 0; });
+            document.getElementById('total_weight_input').value = "";
+            document.getElementById('resultArea').style.display = 'none';
+        }
+
+        const PARCELS = {
+            's60':  { id: 's60', w: 25, h: 20, d: 10, vol: 5000, hex: 0x3B82F6, name: 'S60' },
+            's90':  { id: 's90', w: 35, h: 25, d: 20, vol: 17500, hex: 0x10B981, name: 'S90' },
+            's120': { id: 's120', w: 45, h: 35, d: 30, vol: 47250, hex: 0xF59E0B, name: 'S120' },
+            's150': { id: 's150', w: 60, h: 40, d: 40, vol: 96000, hex: 0xEF4444, name: 'S150' }
+        };
+        const CAGE = { w: 110, h: 170, d: 80 }; 
+        const CAGE_EMPTY_WEIGHT = 45; 
+        
+        const TRUCKS = [
+            { id: '35T', name: "35噸以上", max_cages: 42, max_kg: 20000, cost: 12000, w: 250, l: 1560, h: 240, cw: 80, cl: 110, cols: 3 },
+            { id: '15T', name: "15噸 / 17噸", max_cages: 21, max_kg: 8000, cost: 7000, w: 250, l: 790, h: 245, cw: 80, cl: 110, cols: 3 },
+            { id: '8T', name: "8.5噸 / 11噸", max_cages: 12, max_kg: 4000, cost: 4500, w: 230, l: 500, h: 225, cw: 110, cl: 80, cols: 2 },
+            { id: '3T', name: "3.49噸 / 5噸", max_cages: 6, max_kg: 1500, cost: 2500, w: 170, l: 350, h: 190, cw: 80, cl: 110, cols: 2 }
+        ];
+
+        let globalLayouts = {}; 
+        let scene, camera, renderer, controls, animationId;
+        
+        let truckGroup = null; 
+        let leftDoorGroup, rightDoorGroup, tailLiftGroup;
+        let isDoorOpen = false;
+        let currentMode = 'cage';
+
+        // 🌟 彩蛋相關全域變數
+        let trafficCones = []; 
+        let avalancheBoxes = []; 
+        let avalancheTriggered = false;
+        let isDrivingAway = false;
+        let driveSpeed = 0;
+        let isGoldenTheme = false;
+
+        // 🌟 防呆彩蛋
+        function checkEasterEgg9999(input) {
+            if(parseInt(input.value) === 9999) {
+                alert("老闆，你確定嗎？理貨大哥會哭喔！😭\n(系統依然會幫你算，但請三思)");
+            }
+        }
+
+        // 🌟 柯納米密碼彩蛋 (優化大小寫兼容)
+        let konamiCode = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','b','a'];
+        let konamiIndex = 0;
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === konamiCode[konamiIndex]) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    isGoldenTheme = !isGoldenTheme;
+                    document.body.classList.toggle('golden-theme', isGoldenTheme);
+                    alert(isGoldenTheme ? "🏆 已解鎖：VIP 皇家賽博黃金車隊！" : "已關閉黃金模式");
+                    konamiIndex = 0;
+                }
+            } else { konamiIndex = 0; }
+        });
+
+        // 🌟 更新版：移除大嘴鳥，保留宅配通文字與曲線排版
+        function createPelicanTexture(truckLength, truckHeight) {
+            const canvas = document.createElement('canvas');
+            const aspect = truckLength / truckHeight;
+            canvas.height = 512;
+            canvas.width = 512 * aspect; 
+            const w = canvas.width;
+            const h = canvas.height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = isGoldenTheme ? '#451A03' : '#FFFFFF';
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            ctx.quadraticCurveTo(w/2, h*0.6, w, 0);
+            ctx.lineTo(w, h);
+            ctx.fillStyle = isGoldenTheme ? '#F59E0B' : '#F59E0B'; 
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            ctx.quadraticCurveTo(w/2, h*0.8, w, h*0.4);
+            ctx.lineTo(w, h);
+            ctx.fillStyle = isGoldenTheme ? '#B45309' : '#1E3A8A'; 
+            ctx.fill();
+
+            // 繪製文字 (向左微調以平衡無大嘴鳥後的版面)
+            ctx.fillStyle = isGoldenTheme ? '#FBBF24' : '#1E3A8A';
+            ctx.font = 'italic bold 40px Arial';
+            ctx.fillText('pelican', w*0.1, h*0.25);
+            ctx.font = 'bold 110px "Microsoft JhengHei", sans-serif';
+            ctx.fillText('宅配通', w*0.1 - 20, h*0.5);
+            ctx.font = 'bold 35px "Microsoft JhengHei", sans-serif';
+            ctx.fillStyle = '#60A5FA'; 
+            ctx.fillText('台灣宅配通(股)公司', w*0.1, h*0.85);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = 16;
+            return texture; 
+        }
+
+        // 🌟 彩蛋：夢幻包裹塗裝
+        function getBoxMaterial(hexColor) {
+            if (Math.random() < 0.03) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fdf6e3'; ctx.fillRect(0,0,128,128);
+                ctx.fillStyle = '#000000'; ctx.font = 'bold 24px "Microsoft JhengHei"'; ctx.textAlign = 'center';
+                ctx.fillText(Math.random() > 0.5 ? 'PS5' : '內有惡犬', 64, 70);
+                return new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas) });
+            }
+            return new THREE.MeshLambertMaterial({ color: isGoldenTheme ? 0xFBBF24 : hexColor, metalness: isGoldenTheme ? 0.8 : 0 });
+        }
+
+        // 🌟 彩蛋：動態三角錐模型
+        function createTrafficCone() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.BoxGeometry(20, 3, 20), new THREE.MeshLambertMaterial({color: 0xEF4444}));
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(8, 30, 16), new THREE.MeshLambertMaterial({color: 0xEF4444}));
+            cone.position.y = 15; group.add(base); group.add(cone);
+            group.visible = false; 
+            return group;
+        }
+
+        // 高度地圖分層物理引擎
+// Geometric packing only: lowest available position, full base support, no arbitrary height cap.
+function packBoxes(boxesToPack) {
+ const step=5, W=Math.floor(CAGE.w/step), D=Math.floor(CAGE.d/step);
+ const heights=Array.from({length:W},()=>Array(D).fill(0));
+ const placed=[];
+ let pending=[...boxesToPack].sort((a,b)=>(b.unloadOrder??0)-(a.unloadOrder??0) || b.w*b.h*b.d-a.w*a.h*a.d || b.w*b.d-a.w*a.d);
+ while(pending.length){
+  const unplaced=[];let progress=false;
+  for(const box of pending){
+   const h=Math.min(box.w,box.h,box.d);
+   const orientations=[[box.w,box.h,box.d],[box.w,box.d,box.h],[box.h,box.w,box.d],[box.h,box.d,box.w],[box.d,box.w,box.h],[box.d,box.h,box.w]].filter((o,i,a)=>o[1]===h&&a.findIndex(q=>q.join()===o.join())===i);
+   let best=null;
+   for(const ori of orientations){
+    const bw=Math.ceil(ori[0]/step),bd=Math.ceil(ori[2]/step);
+    for(let z=0;z<=D-bd;z++)for(let x=0;x<=W-bw;x++){
+     const y=heights[x][z];if(y+h>CAGE.h||(best&&y>best.y))continue;
+     let supported=true;
+     for(let i=x;i<x+bw&&supported;i++)for(let j=z;j<z+bd;j++)if(heights[i][j]!==y){supported=false;break;}
+     if(!supported)continue;
+     if(box.unloadOrder!=null){
+      const px=x*step,pz=z*step;
+      const blocked=placed.some(p=>{
+       const overlapX=px<p.x+p.w&&px+ori[0]>p.x;
+       const overlapZ=pz<p.z+p.d&&pz+ori[2]>p.z;
+       const overlapY=y<p.y+p.h&&y+h>p.y;
+       // Door is at +Z. A later parcel must not block an earlier parcel's straight exit.
+       if(overlapX&&overlapY){
+        if(box.unloadOrder<p.unloadOrder&&p.z>=pz+ori[2])return true;
+        if(box.unloadOrder>p.unloadOrder&&pz>=p.z+p.d)return true;
+       }
+       // Do not require removing an earlier supporting parcel before a later upper one.
+       return overlapX&&overlapZ&&p.y+p.h===y&&box.unloadOrder>p.unloadOrder;
+      });
+      if(blocked)continue;
+     }
+     const aligned=placed.some(p=>p.y+p.h===y&&p.x===x*step&&p.z===z*step&&p.w===ori[0]&&p.d===ori[2])?1:0;
+     if(!best||y<best.y||(y===best.y&&(aligned>best.aligned||aligned===best.aligned&&(z<best.z||z===best.z&&x<best.x))))best={x,z,y,bw,bd,ori,aligned};
+    }
+   }
+   if(!best){unplaced.push(box);continue;}
+   const p=best;
+   for(let x=p.x;x<p.x+p.bw;x++)for(let z=p.z;z<p.z+p.bd;z++)heights[x][z]=p.y+h;
+   placed.push({id:box.id,name:box.name,hex:box.hex,unloadOrder:box.unloadOrder??null,x:p.x*step,y:p.y,z:p.z*step,w:p.ori[0],h,d:p.ori[2]});progress=true;
+  }
+  pending=unplaced;
+  // Retry previously rejected large boxes if later boxes created a new level surface.
+  if(!progress)break;
+ }
+ return {placed,unplaced:pending};
+}
+
+        let maxCagesTemplate = {};
+        // Templates are prepared by the extension worker.
+
+        function processCalculation() {
+            let btn = document.getElementById('calcBtn');
+            btn.innerText = "⏳ 運算中...";
+            setTimeout(() => {
+                runLogic();
+                btn.innerText = "🚀 開始極速運算建議派車配置";
+            }, 50); 
+        }
+
+        function runLogic() {
+            let strategy = document.querySelector('input[name="pack_strategy"]:checked').value;
+            let cageHtml = '';
+            let totalCages = 0;
+            globalLayouts = {}; 
+            let hasItems = false;
+            let poolCounts = { s60: 0, s90: 0, s120: 0, s150: 0 };
+
+            if (strategy === 'standard') {
+                ['s60', 's90', 's120', 's150'].forEach(type => {
+                    let qty = parseInt(document.getElementById(`qty_${type}`).value) || 0;
+                    if (qty > 0) {
+                        hasItems = true;
+                        let maxPerCage = maxCagesTemplate[type].length;
+                        let fullCages = Math.floor(qty / maxPerCage);
+                        let remainder = qty % maxPerCage;
+                        
+                        totalCages += fullCages;
+                        poolCounts[type] = remainder; 
+                        
+                        if (fullCages > 0) globalLayouts[`full_${type}`] = maxCagesTemplate[type]; 
+                        cageHtml += `<li class="list-item">
+                            <div>
+                                <span class="color-dot" style="background:#${PARCELS[type].hex.toString(16)}; margin-right:8px; vertical-align:middle;"></span>
+                                <b>${PARCELS[type].name}</b> (${qty}件) ➔ 獨立裝滿 <b>${fullCages}</b> 籠 <small style="color:#64748B;">(餘 ${remainder} 件混裝)</small>
+                            </div>
+                            ${fullCages > 0 ? `<button class="btn-3d no-print" onclick="openCage3D('full_${type}', '${PARCELS[type].name} 滿載籠')">🔍 籠車 3D</button>` : `<span class="no-print" style="color:#94A3B8; font-size:0.9rem;">不足滿載</span>`}
+                        </li>`;
+                    }
+                });
+            } else if (strategy === 'global') {
+                ['s60', 's90', 's120', 's150'].forEach(type => {
+                    let qty = parseInt(document.getElementById(`qty_${type}`).value) || 0;
+                    if (qty > 0) { hasItems = true; poolCounts[type] = qty; } 
+                });
+            } else if (strategy === 'custom') {
+                ['s60', 's90', 's120', 's150'].forEach(type => {
+                    let qty = parseInt(document.getElementById(`qty_${type}`).value) || 0;
+                    let isAllowedToMix = document.getElementById(`chk_${type}`).checked;
+                    if (qty > 0) {
+                        hasItems = true;
+                        if (isAllowedToMix) {
+                            poolCounts[type] = qty; 
+                        } else {
+                            let maxPerCage = maxCagesTemplate[type].length;
+                            let fullCages = Math.floor(qty / maxPerCage);
+                            let remainder = qty % maxPerCage;
+                            let remCages = (remainder > 0) ? 1 : 0;
+                            
+                            totalCages += fullCages + remCages;
+                            if (fullCages > 0) globalLayouts[`custom_full_${type}`] = maxCagesTemplate[type]; 
+                            if (remainder > 0) {
+                                let remBoxes = Array(remainder).fill().map(()=>({...PARCELS[type]}));
+                                globalLayouts[`custom_rem_${type}`] = packBoxes(remBoxes).placed;
+                            }
+
+                            cageHtml += `<li class="list-item">
+                                <div>
+                                    <span class="color-dot" style="background:#${PARCELS[type].hex.toString(16)}; margin-right:8px;"></span>
+                                    <b>${PARCELS[type].name}</b> (${qty}件 / 嚴格不混疊) ➔ 佔用 <b>${fullCages + remCages}</b> 籠 <small style="color:#EF4444;">(含 ${remCages} 籠餘數)</small>
+                                </div>
+                                <div style="display:flex; gap:5px;">
+                                    ${fullCages > 0 ? `<button class="btn-3d no-print" onclick="openCage3D('custom_full_${type}', '${PARCELS[type].name} 滿載籠')">🔍 籠車 3D</button>` : ``}
+                                    ${remCages > 0 ? `<button class="btn-3d no-print" style="background:white; color:#EF4444; border-color:#FCA5A5;" onclick="openCage3D('custom_rem_${type}', '${PARCELS[type].name} 獨立餘數')">🔍 餘數 3D</button>` : ``}
+                                </div>
+                            </li>`;
+                        }
+                    }
+                });
+            }
+
+            if (!hasItems) return alert("請至少輸入一項包裹數量！");
+
+            let mixGroupIndex = 1;
+            while(poolCounts.s60 > 0 || poolCounts.s90 > 0 || poolCounts.s120 > 0 || poolCounts.s150 > 0) {
+                let batch = [];
+                let types = ['s150', 's120', 's90', 's60'];
+                
+                let totalRemainingVol = types.reduce((sum, t) => sum + poolCounts[t] * PARCELS[t].vol, 0);
+                let targetVol = CAGE.w * CAGE.h * CAGE.d * 1.15; 
+                let ratio = Math.min(1, targetVol / totalRemainingVol);
+
+                for (let type of types) {
+                    if (poolCounts[type] > 0) {
+                        let take = Math.min(poolCounts[type], Math.floor(CAGE.w * CAGE.h * CAGE.d / PARCELS[type].vol));
+                        if (take === 0 && poolCounts[type] > 0) take = 1; 
+                        if (take > poolCounts[type]) take = poolCounts[type];
+                        for(let i=0; i<take; i++) batch.push({...PARCELS[type]});
+                    }
+                }
+
+                if (batch.length === 0) break;
+                let placed = packBoxes(batch).placed;
+                if (placed.length === 0) break; 
+
+                let used = { 's60': 0, 's90': 0, 's120': 0, 's150': 0 };
+                placed.forEach(b => { used[b.id]++ });
+
+                let repeatTimes = Infinity;
+                for (let type of types) {
+                    if (used[type] > 0) repeatTimes = Math.min(repeatTimes, Math.floor(poolCounts[type] / used[type]));
+                }
+                if (repeatTimes < 1) repeatTimes = 1; 
+
+                for (let type of types) poolCounts[type] -= used[type] * repeatTimes;
+
+                totalCages += repeatTimes;
+                let key = `mix_pattern_${mixGroupIndex}`;
+                globalLayouts[key] = placed;
+                
+                let summaryText = Object.entries(used).filter(([n,c])=>c>0).map(([n,c])=>`${PARCELS[n].name}: ${c}`).join('、');
+
+                cageHtml += `<li class="list-item" style="background:${strategy === 'global' ? '#FFFBEB' : '#F1F5F9'}; padding:12px 15px; border-radius:8px; margin-top:8px; border:1px solid ${strategy === 'global' ? '#FDE68A' : '#E2E8F0'}; flex-direction:column; align-items:flex-start; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                        <div style="color:${strategy === 'global' ? '#92400E' : '#334155'}; font-size:1.05rem;">🧩 <b>混裝版型 #${mixGroupIndex}</b> ➔ 共 <b>${repeatTimes}</b> 籠</div>
+                        <button class="btn-3d no-print" style="background:white; color:${strategy === 'global' ? '#B45309' : ''}; border-color:${strategy === 'global' ? '#FDE68A' : ''};" onclick="openCage3D('${key}', '混裝版型 #${mixGroupIndex}')">🔍 籠車 3D</button>
+                    </div>
+                    <div style="font-size:0.9rem; color:#64748B;">單籠內容物：${summaryText}<br>箱體體積使用率：${(placed.reduce((sum,b)=>sum+b.w*b.h*b.d,0)/(CAGE.w*CAGE.h*CAGE.d)*100).toFixed(1)}% · ${Object.values(poolCounts).some(n=>n>0) ? "依目前排列，剩餘尺寸無法繼續放入；不保證最優排列" : "本批包裹已分配完畢，剩餘空間不再補貨"}</div>
+                </li>`;
+                mixGroupIndex++;
+            }
+
+            let packageWeight = parseFloat(document.getElementById('total_weight_input').value) || 0;
+            let totalEmptyCagesWeight = totalCages * CAGE_EMPTY_WEIGHT;
+            let totalGrossWeight = packageWeight > 0 ? (packageWeight + totalEmptyCagesWeight) : 0;
+            
+            document.getElementById('resTotalCages').innerText = `${totalCages} 台`;
+            document.getElementById('resTotalWeightLabel').innerHTML = packageWeight > 0 
+                ? `<div style="font-size: 0.9rem; color: #64748B;">貨物 ${packageWeight.toLocaleString()} kg + 籠車 ${totalEmptyCagesWeight.toLocaleString()} kg</div><div style="margin-top: 4px;">= 總計 ${totalGrossWeight.toLocaleString()} kg</div>`
+                : `<span style="color:#94A3B8; font-weight:normal; font-size:1.2rem;">未提供總重</span>`;
+            
+            document.getElementById('cageDetailsList').innerHTML = cageHtml;
+
+            let remainingCages = totalCages;
+            const averageCageKg = totalGrossWeight > 0 ? totalGrossWeight / totalCages : null;
+            const capacity = truck => {
+                if (averageCageKg === null) return truck.max_cages;
+                // Cross-multiply totals rather than floor a repeatedly rounded average.
+                const allowed = truck.max_kg * totalCages;
+                const fits = n => {
+                    const load = totalGrossWeight * n;
+                    return load <= allowed + Number.EPSILON * Math.max(load, allowed) * 4;
+                };
+                let count = Math.min(truck.max_cages, Math.floor(allowed / totalGrossWeight));
+                if (count < truck.max_cages && fits(count + 1)) count++;
+                while (count > 0 && !fits(count)) count--;
+                return count;
+            };
+            const availableTrucks = TRUCKS.filter(truck => capacity(truck) > 0);
+            if (!availableTrucks.length) throw new Error('平均單籠重量超過所有車型載重，無法產生派車配置。請確認總重或重新分籠。');
+            let assignedTruckInstances = [];
+            let totalCost = 0;
+            while (remainingCages > 0) {
+                // Keep the original preference: smallest truck that holds the remainder.
+                let bestTruck = [...availableTrucks].reverse().find(truck => capacity(truck) >= remainingCages);
+                if (!bestTruck) bestTruck = availableTrucks.reduce((best, truck) => capacity(truck) > capacity(best) ? truck : best);
+                const cagesLoaded = Math.min(remainingCages, capacity(bestTruck));
+                assignedTruckInstances.push({id:bestTruck.id,name:bestTruck.name,cagesLoaded,maxCages:bestTruck.max_cages,cost:bestTruck.cost,maxKg:bestTruck.max_kg,estimatedKg:averageCageKg === null ? null : totalGrossWeight * cagesLoaded / totalCages});
+                remainingCages -= cagesLoaded;
+                totalCost += bestTruck.cost;
+            }
+
+            let truckHtml = '';
+            assignedTruckInstances.forEach((truck, index) => {
+                let utilPct = Math.round((truck.cagesLoaded / truck.maxCages) * 100) || 0;
+                let fillClass = utilPct === 100 ? 'full' : '';
+                
+                truckHtml += `
+                <li class="list-item truck-item">
+                    <div class="truck-header">
+                        <span class="truck-name">🚚 ${truck.name} <small style="color:#64748B; font-weight:normal;">(車輛 ${index + 1})</small></span>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="truck-cages">裝載 ${truck.cagesLoaded} 籠</span>
+                            <button class="btn-3d truck no-print" onclick="openTruck3D('${truck.id}', ${truck.cagesLoaded}, ${index + 1})">🔍 車廂透視</button>
+                        </div>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill ${fillClass}" style="width: ${utilPct}%;"></div>
+                    </div>
+                    <div class="truck-util">${truck.estimatedKg === null ? "未提供總重，尚未檢查載重" : "平均分配估算：" + truck.estimatedKg.toFixed(1) + " kg ／ 載重上限 " + truck.maxKg + " kg（含籠重，請核對實際各籠重量）"}</div><div class="truck-util">車廂空間利用率：${utilPct}% <small style="color:#94A3B8;">(滿載為 ${truck.maxCages} 籠)</small></div>
+                </li>`;
+            });
+
+            document.getElementById('truckDetailsList').innerHTML = truckHtml;
+            document.getElementById('resTotalCost').innerText = `預估總運費：$ ${totalCost.toLocaleString()}`;
+
+            const resultArea = document.getElementById('resultArea');
+            resultArea.style.display = 'block';
+            resultArea.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ================= 3D 互動整合系統 =================
+        function toggleDoor() {
+            isDoorOpen = !isDoorOpen;
+            let btn = document.getElementById('btnToggleDoor');
+            if(isDoorOpen) {
+                btn.innerHTML = currentMode === 'cage' ? "🚪 關閉籠車對開門" : "🚪 關閉尾門與車門";
+                btn.style.background = "#DC2626";
+            } else {
+                btn.innerHTML = currentMode === 'cage' ? "🚪 打開籠車對開門" : "🚪 打開尾門與車門";
+                btn.style.background = "var(--primary)";
+            }
+
+            if (currentMode === 'truck' && typeof trafficCones !== 'undefined') {
+                trafficCones.forEach(c => c.visible = isDoorOpen);
+            }
+        }
+
+        function close3D() {
+            document.getElementById('modal3d').style.display = 'none';
+            if (animationId) cancelAnimationFrame(animationId);
+            if (renderer) renderer.dispose();
+            avalancheTriggered = false; 
+            isDrivingAway = false;
+            driveSpeed = 0;
+        }
+
+        // ================= 1. 籠車視角渲染 =================
+        function openCage3D(layoutKey, title) {
+            currentMode = 'cage';
+            isDoorOpen = false;
+            avalancheTriggered = false;
+            let btn = document.getElementById('btnToggleDoor');
+            btn.innerHTML = "🚪 打開籠車對開門";
+            btn.style.background = "var(--primary)";
+
+            document.getElementById('modal3d').style.display = 'flex';
+            document.getElementById('modalTitle').innerText = title + ' 3D 空間配置';
+            
+            document.getElementById('hudDimTitle').innerText = '📐 籠車內部規格';
+            document.getElementById('hudDimX').innerHTML = `X 寬度：${CAGE.w} cm <span>(對開門處)</span>`;
+            document.getElementById('hudDimZ').innerHTML = `Z 深度：${CAGE.d} cm`;
+            document.getElementById('hudDimY').innerHTML = `Y 高度：${CAGE.h} cm`;
+            document.getElementById('hudLegend').style.display = 'flex';
+
+            initCageScene(globalLayouts[layoutKey]);
+        }
+
+        function initCageScene(layoutData) {
+            const container = document.getElementById('canvas3d');
+            container.innerHTML = ''; 
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(isGoldenTheme ? 0x0F172A : 0xF8FAFC);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1500);
+            camera.position.set(CAGE.w/2, CAGE.h + 50, CAGE.d + 300);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(CAGE.w/2, CAGE.h/2, CAGE.d/2);
+            controls.update();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight.position.set(CAGE.w/2, 300, CAGE.d + 200);
+            scene.add(dirLight);
+
+            const matCage = new THREE.MeshBasicMaterial({ color: 0x10B981, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+            const matEdge = new THREE.LineBasicMaterial({ color: 0x059669, linewidth: 2 });
+
+            const backGeo = new THREE.PlaneGeometry(CAGE.w, CAGE.h);
+            const backMesh = new THREE.Mesh(backGeo, matCage);
+            backMesh.position.set(CAGE.w/2, CAGE.h/2, 0);
+            scene.add(backMesh);
+            const backEdge = new THREE.LineSegments(new THREE.EdgesGeometry(backGeo), matEdge);
+            backEdge.position.copy(backMesh.position); scene.add(backEdge);
+
+            const sideGeo = new THREE.PlaneGeometry(CAGE.d, CAGE.h);
+            const leftMesh = new THREE.Mesh(sideGeo, matCage);
+            leftMesh.rotation.y = -Math.PI / 2; leftMesh.position.set(0, CAGE.h/2, CAGE.d/2);
+            scene.add(leftMesh);
+            const leftEdge = new THREE.LineSegments(new THREE.EdgesGeometry(sideGeo), matEdge);
+            leftEdge.rotation.copy(leftMesh.rotation); leftEdge.position.copy(leftMesh.position); scene.add(leftEdge);
+
+            const rightMesh = new THREE.Mesh(sideGeo, matCage);
+            rightMesh.rotation.y = Math.PI / 2; rightMesh.position.set(CAGE.w, CAGE.h/2, CAGE.d/2);
+            scene.add(rightMesh);
+            const rightEdge = new THREE.LineSegments(new THREE.EdgesGeometry(sideGeo), matEdge);
+            rightEdge.rotation.copy(rightMesh.rotation); rightEdge.position.copy(rightMesh.position); scene.add(rightEdge);
+
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x047857, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+            const floorGeo = new THREE.PlaneGeometry(CAGE.w, CAGE.d);
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = Math.PI / 2; floor.position.set(CAGE.w/2, 0, CAGE.d/2);
+            scene.add(floor);
+            
+            const doorGeo = new THREE.PlaneGeometry(CAGE.w/2, CAGE.h);
+            leftDoorGroup = new THREE.Group();
+            leftDoorGroup.position.set(0, 0, CAGE.d);
+            const dLeftMesh = new THREE.Mesh(doorGeo, matCage);
+            dLeftMesh.position.set(CAGE.w/4, CAGE.h/2, 0); 
+            leftDoorGroup.add(dLeftMesh);
+            const dLeftEdge = new THREE.LineSegments(new THREE.EdgesGeometry(doorGeo), matEdge);
+            dLeftEdge.position.copy(dLeftMesh.position); leftDoorGroup.add(dLeftEdge);
+            scene.add(leftDoorGroup);
+
+            rightDoorGroup = new THREE.Group();
+            rightDoorGroup.position.set(CAGE.w, 0, CAGE.d);
+            const dRightMesh = new THREE.Mesh(doorGeo, matCage);
+            dRightMesh.position.set(-CAGE.w/4, CAGE.h/2, 0); 
+            rightDoorGroup.add(dRightMesh);
+            const dRightEdge = new THREE.LineSegments(new THREE.EdgesGeometry(doorGeo), matEdge);
+            dRightEdge.position.copy(dRightMesh.position); rightDoorGroup.add(dRightEdge);
+            scene.add(rightDoorGroup);
+
+            avalancheBoxes = []; 
+            if (layoutData) {
+                layoutData.forEach(box => {
+                    const geo = new THREE.BoxGeometry(box.w - 0.5, box.h - 0.5, box.d - 0.5);
+                    const mat = getBoxMaterial(box.hex); 
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(box.x + box.w/2, box.y + box.h/2, box.z + box.d/2);
+                    mesh.userData = { isBox: true }; 
+                    scene.add(mesh);
+                    
+                    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true }));
+                    edges.position.copy(mesh.position); scene.add(edges);
+                    
+                    avalancheBoxes.push({mesh: mesh, group: edges});
+                });
+            }
+
+            function animate() {
+                animationId = requestAnimationFrame(animate);
+                if (leftDoorGroup && rightDoorGroup) {
+                    const targetLeftAngle = isDoorOpen ? -Math.PI * 0.7 : 0;
+                    const targetRightAngle = isDoorOpen ? Math.PI * 0.7 : 0;
+                    leftDoorGroup.rotation.y += (targetLeftAngle - leftDoorGroup.rotation.y) * 0.1;
+                    rightDoorGroup.rotation.y += (targetRightAngle - rightDoorGroup.rotation.y) * 0.1;
+
+                    if (avalancheTriggered && isDoorOpen) {
+                        avalancheBoxes.forEach((obj, idx) => {
+                            if(idx > avalancheBoxes.length * 0.3) { 
+                                obj.mesh.position.z += Math.random() * 4;
+                                obj.mesh.position.y -= Math.random() * 1;
+                                obj.mesh.rotation.x += 0.05;
+                                obj.mesh.rotation.y += 0.02;
+                                obj.group.position.copy(obj.mesh.position);
+                                obj.group.rotation.copy(obj.mesh.rotation);
+                            }
+                        });
+                    }
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // ================= 2. 純貨廂 3D (完美時序連動版) =================
+        function openTruck3D(truckId, cagesLoaded, index) {
+            currentMode = 'truck';
+            isDoorOpen = false;
+            avalancheTriggered = false;
+            isDrivingAway = false;
+            driveSpeed = 0;
+            let btn = document.getElementById('btnToggleDoor');
+            btn.innerHTML = "🚪 打開液壓尾門與車門";
+            btn.style.background = "var(--primary)";
+
+            let truck = TRUCKS.find(t => t.id === truckId);
+            document.getElementById('modal3d').style.display = 'flex';
+            document.getElementById('modalTitle').innerText = `${truck.name} (車輛 ${index}) - 純車廂透視`;
+            
+            document.getElementById('hudDimTitle').innerText = '📐 車廂內部規格';
+            document.getElementById('hudDimX').innerHTML = `X 寬度：${truck.w} cm <span>(尾門處)</span>`;
+            document.getElementById('hudDimZ').innerHTML = `Z 深度：${truck.l} cm`;
+            document.getElementById('hudDimY').innerHTML = `Y 高度：${truck.h} cm`;
+            document.getElementById('hudLegend').style.display = 'none';
+
+            initTruckScene(truck, cagesLoaded);
+        }
+
+        function initTruckScene(truck, cagesLoaded) {
+            const container = document.getElementById('canvas3d');
+            container.innerHTML = ''; 
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(isGoldenTheme ? 0x0F172A : 0xF8FAFC);
+            
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 6000);
+            camera.position.set(-600, truck.h + 400, truck.l + 800);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(truck.w/2, truck.h/2, truck.l/2);
+            controls.update();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, isGoldenTheme ? 1.5 : 0.8);
+            dirLight.position.set(-500, truck.h + 500, truck.l + 500);
+            scene.add(dirLight);
+
+            const chassisH = 100; 
+            
+            truckGroup = new THREE.Group();
+            scene.add(truckGroup);
+
+            const matTruckTrans = new THREE.MeshStandardMaterial({ color: isGoldenTheme ? 0xFBBF24 : 0x94A3B8, transparent: true, opacity: isGoldenTheme ? 0.3 : 0.15, side: THREE.DoubleSide, metalness: isGoldenTheme ? 1 : 0 });
+            const matEdge = new THREE.LineBasicMaterial({ color: 0x475569, linewidth: 2 });
+
+            const backGeo = new THREE.PlaneGeometry(truck.w, truck.h);
+            const backMesh = new THREE.Mesh(backGeo, matTruckTrans);
+            backMesh.position.set(truck.w/2, chassisH + truck.h/2, 0);
+            truckGroup.add(backMesh);
+            const backEdge = new THREE.LineSegments(new THREE.EdgesGeometry(backGeo), matEdge);
+            backEdge.position.copy(backMesh.position); truckGroup.add(backEdge);
+
+            const sideGeo = new THREE.PlaneGeometry(truck.l, truck.h);
+            
+            const rightMesh = new THREE.Mesh(sideGeo, matTruckTrans);
+            rightMesh.rotation.y = Math.PI / 2; 
+            rightMesh.position.set(truck.w, chassisH + truck.h/2, truck.l/2);
+            truckGroup.add(rightMesh);
+            const rightEdge = new THREE.LineSegments(new THREE.EdgesGeometry(sideGeo), matEdge);
+            rightEdge.rotation.y = Math.PI / 2; 
+            rightEdge.position.copy(rightMesh.position); 
+            truckGroup.add(rightEdge);
+
+            const pelicanTex = createPelicanTexture(truck.l, truck.h);
+            const logoMat = new THREE.MeshBasicMaterial({ map: pelicanTex, side: THREE.DoubleSide }); 
+            const leftMesh = new THREE.Mesh(sideGeo, logoMat);
+            leftMesh.rotation.y = -Math.PI / 2; 
+            leftMesh.position.set(0, chassisH + truck.h/2, truck.l/2);
+            leftMesh.userData = { isLogo: true }; 
+            truckGroup.add(leftMesh);
+            
+            const leftEdgeLogo = new THREE.LineSegments(new THREE.EdgesGeometry(sideGeo), matEdge);
+            leftEdgeLogo.rotation.y = -Math.PI / 2; 
+            leftEdgeLogo.position.copy(leftMesh.position); 
+            truckGroup.add(leftEdgeLogo);
+
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x1E293B, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+            const floorGeo = new THREE.PlaneGeometry(truck.w, truck.l);
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = Math.PI / 2; floor.position.set(truck.w/2, chassisH, truck.l/2);
+            truckGroup.add(floor);
+
+            const chassisGeo = new THREE.BoxGeometry(truck.w * 0.85, 20, truck.l);
+            const chassisMat = new THREE.MeshLambertMaterial({ color: 0x1E293B });
+            const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+            chassis.position.set(truck.w/2, chassisH - 10, truck.l/2); 
+            truckGroup.add(chassis);
+
+            const wheelRadius = 40;
+            const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 30, 32);
+            const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
+            const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.6, wheelRadius * 0.6, 32, 16);
+            const rimMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 });
+            
+            function addAxle(zPos) {
+                const wheelGroupL = new THREE.Group();
+                wheelGroupL.position.set(15, wheelRadius, zPos);
+                wheelGroupL.rotation.z = Math.PI / 2; 
+                const spinGroupL = new THREE.Group();
+                spinGroupL.userData = { isSpinGroup: true };
+                const tireL = new THREE.Mesh(wheelGeo, tireMat);
+                tireL.userData = { isWheelLeft: true }; 
+                const rimL = new THREE.Mesh(rimGeo, rimMat);
+                spinGroupL.add(tireL); spinGroupL.add(rimL);
+                wheelGroupL.add(spinGroupL);
+                truckGroup.add(wheelGroupL);
+
+                const wheelGroupR = new THREE.Group();
+                wheelGroupR.position.set(truck.w - 15, wheelRadius, zPos);
+                wheelGroupR.rotation.z = Math.PI / 2; 
+                const spinGroupR = new THREE.Group();
+                spinGroupR.userData = { isSpinGroup: true };
+                const tireR = new THREE.Mesh(wheelGeo, tireMat);
+                tireR.userData = { isWheelRight: true }; 
+                const rimR = new THREE.Mesh(rimGeo, rimMat);
+                spinGroupR.add(tireR); spinGroupR.add(rimR);
+                wheelGroupR.add(spinGroupR);
+                truckGroup.add(wheelGroupR);
+            }
+            
+            addAxle(60); 
+            addAxle(truck.l - 80); 
+            if(truck.l > 600) addAxle(truck.l - 190); 
+            if(truck.l > 1000) addAxle(truck.l - 300); 
+
+            const tailLiftH = 150; 
+            tailLiftGroup = new THREE.Group();
+            tailLiftGroup.position.set(truck.w/2, chassisH, truck.l); 
+            const tailLiftGeo = new THREE.BoxGeometry(truck.w, tailLiftH, 6);
+            const tailLiftMat = new THREE.MeshLambertMaterial({ color: 0x475569 }); 
+            const tMesh = new THREE.Mesh(tailLiftGeo, tailLiftMat);
+            tMesh.position.set(0, tailLiftH/2, 0); 
+            tMesh.userData = { isTailLift: true }; 
+            tailLiftGroup.add(tMesh);
+            truckGroup.add(tailLiftGroup);
+
+            const doorGeo = new THREE.PlaneGeometry(truck.w/2, truck.h);
+            leftDoorGroup = new THREE.Group();
+            leftDoorGroup.position.set(0, chassisH, truck.l);
+            const dLeftMesh = new THREE.Mesh(doorGeo, matTruckTrans);
+            dLeftMesh.position.set(truck.w/4, truck.h/2, 0); 
+            leftDoorGroup.add(dLeftMesh);
+            truckGroup.add(leftDoorGroup);
+
+            rightDoorGroup = new THREE.Group();
+            rightDoorGroup.position.set(truck.w, chassisH, truck.l);
+            const dRightMesh = new THREE.Mesh(doorGeo, matTruckTrans);
+            dRightMesh.position.set(-truck.w/4, truck.h/2, 0); 
+            rightDoorGroup.add(dRightMesh);
+            truckGroup.add(rightDoorGroup);
+
+            trafficCones = []; 
+            let cone1 = createTrafficCone(); cone1.position.set(30, 0, truck.l + 100); scene.add(cone1);
+            let cone2 = createTrafficCone(); cone2.position.set(truck.w - 30, 0, truck.l + 100); scene.add(cone2);
+            trafficCones.push(cone1, cone2);
+
+            const cageMat = new THREE.MeshLambertMaterial({ color: isGoldenTheme ? 0xF59E0B : 0x10B981, metalness: isGoldenTheme?0.8:0 }); 
+            const cageEdgeMat = new THREE.LineBasicMaterial({ color: 0x064E3B, opacity: 0.8, transparent: true });
+
+            avalancheBoxes = []; 
+            for(let i = 0; i < cagesLoaded; i++) {
+                let row = Math.floor(i / truck.cols);
+                let col = i % truck.cols;
+                
+                let cx = (col * truck.cw) + (truck.w - truck.cols * truck.cw) / 2 + (truck.cw / 2);
+                let cz = (row * truck.cl) + (truck.cl / 2) + 10; 
+
+                const cGeo = new THREE.BoxGeometry(truck.cw - 4, CAGE.h, truck.cl - 4);
+                const cMesh = new THREE.Mesh(cGeo, cageMat);
+                cMesh.position.set(cx, chassisH + CAGE.h/2, cz);
+                cMesh.userData = { isBox: true }; 
+                truckGroup.add(cMesh);
+
+                const cEdges = new THREE.LineSegments(new THREE.EdgesGeometry(cGeo), cageEdgeMat);
+                cEdges.position.copy(cMesh.position);
+                truckGroup.add(cEdges);
+                
+                avalancheBoxes.push({mesh: cMesh, group: cEdges});
+            }
+
+            function animate() {
+                animationId = requestAnimationFrame(animate);
+                if (leftDoorGroup && rightDoorGroup && tailLiftGroup) {
+                    let targetLeftAngle = 0;
+                    let targetRightAngle = 0;
+                    let targetTailLiftAngle = 0;
+
+                    if (isDoorOpen) {
+                        targetTailLiftAngle = Math.PI / 2;
+                        if (tailLiftGroup.rotation.x > 1.4) {
+                            targetLeftAngle = -Math.PI * 0.7;
+                            targetRightAngle = Math.PI * 0.7;
+                        }
+                    } else {
+                        targetLeftAngle = 0;
+                        targetRightAngle = 0;
+                        if (Math.abs(leftDoorGroup.rotation.y) < 0.1 && Math.abs(rightDoorGroup.rotation.y) < 0.1) {
+                            targetTailLiftAngle = 0;
+                        } else {
+                            targetTailLiftAngle = Math.PI / 2; 
+                        }
+                    }
+
+                    leftDoorGroup.rotation.y += (targetLeftAngle - leftDoorGroup.rotation.y) * 0.1;
+                    rightDoorGroup.rotation.y += (targetRightAngle - rightDoorGroup.rotation.y) * 0.1;
+                    tailLiftGroup.rotation.x += (targetTailLiftAngle - tailLiftGroup.rotation.x) * 0.1;
+
+                    // 🌟 物理山崩彩蛋
+                    if (avalancheTriggered && isDoorOpen && tailLiftGroup.rotation.x > 1.4) {
+                        avalancheBoxes.forEach((obj, idx) => {
+                            if(idx > avalancheBoxes.length * 0.4) { 
+                                obj.mesh.position.z += Math.random() * 8;
+                                obj.mesh.position.y -= Math.random() * 2;
+                                obj.mesh.rotation.x += 0.05;
+                                obj.mesh.rotation.y += 0.02;
+                                obj.group.position.copy(obj.mesh.position);
+                                obj.group.rotation.copy(obj.mesh.rotation);
+                            }
+                        });
+                    }
+
+                    // 🌟 發車駛離彩蛋
+                    if (isDrivingAway && truckGroup) {
+                        driveSpeed = Math.min(driveSpeed + 0.2, 30); // 逐漸加速至最高速
+                        truckGroup.position.z -= driveSpeed;
+                        truckGroup.traverse((child) => {
+                            if (child.userData && child.userData.isSpinGroup) {
+                                child.rotation.y -= driveSpeed * 0.05; // 輪胎滾動
+                            }
+                        });
+                    }
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        window.addEventListener('resize', () => {
+            if (renderer && document.getElementById('modal3d').style.display === 'flex') {
+                const container = document.getElementById('canvas3d');
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let boxClickCount = 0;
+        let logoClickCount = 0;
+
+        window.addEventListener('click', (e) => {
+            if(document.getElementById('modal3d').style.display !== 'flex' || !renderer) return;
+            
+            const rect = renderer.domElement.getBoundingClientRect();
+            if(e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                let userData = obj.userData;
+                while(!userData || Object.keys(userData).length === 0) {
+                    if(!obj.parent) break;
+                    obj = obj.parent;
+                    userData = obj.userData;
+                }
+
+                if (userData.isWheelLeft) {
+                    let u = new SpeechSynthesisUtterance("車輛左轉，請注意安全。"); u.lang='zh-TW'; window.speechSynthesis.speak(u);
+                }
+                if (userData.isWheelRight) {
+                    let u = new SpeechSynthesisUtterance("車輛右轉，請注意安全。"); u.lang='zh-TW'; window.speechSynthesis.speak(u);
+                }
+                if (userData.isTailLift) {
+                    let u = new SpeechSynthesisUtterance("倒車，請注意。"); u.lang='zh-TW'; window.speechSynthesis.speak(u);
+                }
+                
+                if (userData.isBox) {
+                    boxClickCount++;
+                    if (boxClickCount >= 3) {
+                        avalancheTriggered = true;
+                        boxClickCount = 0; 
+                    }
+                }
+
+                // 🌟 發車彩蛋觸發點
+                if (userData.isLogo) {
+                    logoClickCount++;
+                    if (logoClickCount >= 3) {
+                        isDrivingAway = true;
+                        logoClickCount = 0;
+                        
+                        // 強制關門
+                        if (isDoorOpen) {
+                            toggleDoor();
+                        }
+                        
+                        let u = new SpeechSynthesisUtterance("引擎發動，準備出發！"); 
+                        u.lang='zh-TW'; 
+                        window.speechSynthesis.speak(u);
+                    }
+                }
+            }
+        });
+    </script>
+<script>
+(() => {
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const defaults={parcels:JSON.parse(JSON.stringify(PARCELS)),cage:{...CAGE},empty:45,trucks:JSON.parse(JSON.stringify(TRUCKS))};
+let active=JSON.parse(JSON.stringify(defaults)), results=null, worker=null, workerURL=null, layerTimer=null;
+const style=document.createElement('style');style.textContent=`
+.ext-panel{border:1px solid var(--border);border-radius:12px;padding:20px;margin:20px 0;background:var(--card-bg)}
+.ext-panel h3{margin:0 0 12px;color:var(--primary)} .ext-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.ext-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.ext-grid label{display:flex;flex-direction:column;gap:5px}
+.ext-panel input,.ext-panel select{padding:9px;border:1px solid #cbd5e1;border-radius:6px;max-width:100%;font:inherit;background:white;color:#334155}
+.ext-table{width:100%;border-collapse:collapse;font-size:14px}.ext-table th,.ext-table td{text-align:left;padding:9px;border-bottom:1px solid var(--border)}
+.ext-table input{width:88px}.ext-table input[data-field=name]{width:135px}.ext-scroll{overflow:auto}.ext-note{font-size:14px;color:#64748b;line-height:1.7}.ext-alert{color:#b45309;white-space:pre-line}
+#ext-status{white-space:pre-line} .ext-chip{background:#eef2ff;padding:5px 10px;border-radius:20px;color:#1e3a8a}
+body.operations #modalManual,body.operations button[onclick*="modalManual"]{display:none!important}
+[hidden]{display:none!important}
+.grid-cards input[type=number]{appearance:textfield;-moz-appearance:textfield}
+.grid-cards input[type=number]::-webkit-inner-spin-button,.grid-cards input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+@media(max-width:600px){body{padding:8px}.container{padding:20px 14px}.ext-panel{padding:14px}.header h2{font-size:1.35rem}.strategy-container{padding:14px}.radio-group{grid-template-columns:1fr}.color-legend{flex-wrap:wrap;gap:8px}.truck-header{flex-wrap:wrap;gap:10px}.truck-util{flex-wrap:wrap;gap:8px}.list-item{flex-wrap:wrap;gap:10px}.ext-table th,.ext-table td{white-space:nowrap}.weight-input-container{padding:16px}.modal-content{padding:10px;height:92vh}.hud-dimensions{top:8px;left:8px;padding:8px;font-size:12px}.controls-hint{flex-wrap:wrap;gap:6px}}
+@media print{.ext-panel.no-print{display:none!important}#ext-report{display:block!important}.ext-table{font-size:11px}.ext-panel{break-inside:avoid}#ext-status{display:none}}
+`;document.head.appendChild(style);
+const panel=document.createElement('div');panel.className='no-print';
+panel.innerHTML='<div id="ext-status" role="status" aria-live="polite"></div><div class="ext-row"><progress id="ext-progress" hidden></progress><button class="btn-small" id="ext-cancel" hidden>取消運算</button></div>';
+$('calcBtn').after(panel);
+const unloading=document.createElement('details');unloading.className='no-print';unloading.style.margin='16px 0';
+unloading.innerHTML='<summary>先卸貨物靠門（選填）</summary><p class="ext-note">設定籠內卸貨順序：1 先卸、2 次之；相同數字代表同一批。若有設定，所有有件數的規格都要填。同規格若有不同卸貨站，請分批試算。留白僅計算空間。</p><div class="ext-row">'+Object.keys(PARCELS).map(id=>`<label>${PARCELS[id].name} <input type="number" id="unload_${id}" min="1" max="99" step="1" inputmode="numeric" placeholder="未指定" style="width:90px;padding:8px"></label>`).join('')+'</div>';
+$('calcBtn').before(unloading);
+const unloadResult=document.createElement('p');unloadResult.id='unload-result';unloadResult.className='ext-note';$('resultArea').prepend(unloadResult);
+unloading.addEventListener('input',invalidate);
+function readUnloadOrders(qty){const hasOrder=Object.keys(qty).some(id=>qty[id]>0&&($('unload_'+id).value!==''||$('unload_'+id).validity.badInput));for(const id of Object.keys(qty)){const field=$('unload_'+id);let order=null;if(hasOrder&&qty[id]>0){if(field.validity.badInput)throw Error('卸貨順序請輸入有效整數');order=finite(field.value,1,99,PARCELS[id].name+' 卸貨順序',true);}active.parcels[id].unloadOrder=order;}return hasOrder;}
+function status(s,error=false){$('ext-status').textContent=s;$('ext-status').className=error?'ext-alert':'ext-note';}
+function finite(v,min,max,label,integer=false){let n=Number(v);if(String(v).trim()===''||!Number.isFinite(n)||n<min||n>max||(integer&&!Number.isInteger(n)))throw Error(`${label}需為 ${min}～${max} 的${integer?'整數':'數值'}`);return n;}
+function invalidate(){results=null;$('resultArea').style.display='none';}
+// Optional packer: preserves original greedy sorting, adds orientation and conservative support checks.
+function advancedPack(boxes){let sorted=[...boxes].sort((a,b)=>b.vol-a.vol||(b.w*b.d-a.w*a.d)),placed=[],unplaced=[];const step=5,W=Math.floor(CAGE.w/step),D=Math.floor(CAGE.d/step),H=CAGE.h;let heights=Array.from({length:W},()=>Array(D).fill(0)),blocked=Array.from({length:W},()=>Array(D).fill(false));
+ for(const b of sorted){let os=b.orientation==='upright'?[[b.w,b.h,b.d],[b.d,b.h,b.w]]:[[b.w,b.h,b.d],[b.w,b.d,b.h],[b.h,b.w,b.d],[b.h,b.d,b.w],[b.d,b.w,b.h],[b.d,b.h,b.w]];if(!b.orientation||b.orientation==='original')os=os.filter(o=>o[1]===Math.min(b.w,b.h,b.d));let best=null;
+ for(const o of os){const w=Math.ceil(o[0]/step),d=Math.ceil(o[2]/step);for(let z=0;z<=D-d;z++)for(let x=0;x<=W-w;x++){let y=0,bad=false;for(let i=x;i<x+w;i++)for(let j=z;j<z+d;j++){y=Math.max(y,heights[i][j]);bad=bad||blocked[i][j];}if(bad||y+o[1]>H||(b.noStack&&y>0))continue;let supported=true;for(let i=x;i<x+w;i++)for(let j=z;j<z+d;j++)if(heights[i][j]!==y)supported=false;if(!supported)continue;if(!best||y<best.y||(y===best.y&&(z<best.z||z===best.z&&x<best.x)))best={x,z,y,w,d,o};}}
+ if(!best){unplaced.push(b);continue;}let p=best;for(let i=p.x;i<p.x+p.w;i++)for(let j=p.z;j<p.z+p.d;j++){heights[i][j]=p.y+p.o[1];blocked[i][j]=!!b.noStack;}placed.push({...b,x:p.x*step,y:p.y,z:p.z*step,w:p.o[0],h:p.o[1],d:p.o[2]});}return {placed,unplaced};
+}
+const originalPack=packBoxes.toString(),originalRun=runLogic.toString();
+function workerSource(){return `
+let PARCELS,CAGE,CAGE_EMPTY_WEIGHT,TRUCKS,maxCagesTemplate,globalLayouts,audit,document;
+const alert=m=>{throw Error(m)};
+${originalPack}
+const originalPackFn=packBoxes;
+${advancedPack.toString()}
+${originalRun.replace('totalCages += fullCages;','totalCages += fullCages; audit.push({layout:maxCagesTemplate[type],count:fullCages});').replace('totalCages += fullCages + remCages;','totalCages += fullCages + remCages; audit.push({layout:maxCagesTemplate[type],count:fullCages}); if(remainder) audit.push({layout:packBoxes(Array(remainder).fill(PARCELS[type])).placed,count:1});').replace('totalCages += repeatTimes;','totalCages += repeatTimes; audit.push({layout:placed,count:repeatTimes});').replace('if (placed.length === 0) break;','if (placed.length === 0) throw Error("有包裹無法裝入籠車，請檢查尺寸與限制");')}
+onmessage=({data:d})=>{try{PARCELS=d.settings.parcels;CAGE=d.settings.cage;CAGE_EMPTY_WEIGHT=d.settings.empty;TRUCKS=d.settings.trucks;packBoxes=d.advanced?advancedPack:originalPackFn;maxCagesTemplate={};
+ for(const type of Object.keys(PARCELS)){postMessage({progress:'準備 '+PARCELS[type].name+' 裝載版型…'});maxCagesTemplate[type]=packBoxes(Array(500).fill(PARCELS[type])).placed;if(d.qty[type]>0&&!maxCagesTemplate[type].length)throw Error(PARCELS[type].name+' 無法裝入籠車');}
+ let all=[];for(const strategy of [d.strategy]){postMessage({progress:'正在計算 '+({standard:'純貨＋零星',global:'全局混裝',custom:'指定混裝'}[strategy])+'…'});let nodes={};const node=id=>nodes[id]||(nodes[id]={style:{},scrollIntoView(){}});document={getElementById:node,querySelector:()=>({value:strategy})};Object.keys(PARCELS).forEach(t=>{node('qty_'+t).value=d.qty[t];node('chk_'+t).checked=d.mix[t];});node('total_weight_input').value=d.totalWeight;globalLayouts={};audit=[];runLogic();all.push({strategy,nodes:JSON.parse(JSON.stringify(nodes)),layouts:globalLayouts,audit});}postMessage({done:all});}catch(e){postMessage({error:e.message});}};`;}
+function quantities(){let q={};for(const id of Object.keys(PARCELS)){const field=$('qty_'+id);if(field.validity.badInput)throw Error('包裹件數請輸入完整有效的數字');q[id]=finite(field.value||0,0,50000,'包裹件數',true);}if(!Object.values(q).some(Boolean))throw Error('請至少輸入一項包裹數量');if(Object.values(q).reduce((a,b)=>a+b,0)>50000)throw Error('本版每次最多試算 50,000 件，請分批計算');return q;}
+function busy(on){$('calcBtn').disabled=on;$('calcBtn').textContent=on?'⏳ 背景運算中…':'🚀 開始極速運算建議派車配置';$('ext-progress').hidden=!on;$('ext-cancel').hidden=!on;panel.querySelectorAll('input,select,button').forEach(el=>{if(el.id!=='ext-cancel')el.disabled=on;});document.querySelectorAll('.grid-cards input,.strategy-container input,#total_weight_input,[id^=unload_]').forEach(el=>el.disabled=on);}
+function stop(){if(worker)worker.terminate();worker=null;if(workerURL)URL.revokeObjectURL(workerURL);workerURL=null;busy(false);}
+$('ext-cancel').onclick=()=>{stop();status('已取消運算。');};
+window.processCalculation=function(){if(worker)return;try{const qty=quantities();readUnloadOrders(qty);if($('total_weight_input').validity.badInput)throw Error('總淨重請輸入完整有效的數字');let weight=$('total_weight_input').value.trim();if(weight)finite(weight,0,1e9,'總淨重');const known=Object.keys(qty).filter(t=>qty[t]>0).every(t=>active.parcels[t].weight>0);let totalWeight=weight?Number(weight):(known?Object.keys(qty).reduce((n,t)=>n+qty[t]*active.parcels[t].weight,0):0);
+ if(!false&&Object.values(active.parcels).some(p=>[p.w,p.h,p.d].some(n=>n%5!==0)))throw Error('原版使用 5cm 格線；非 5 的倍數尺寸請啟用進階裝載');
+ invalidate();busy(true);status('啟動背景運算，過程中可取消。');let input={strategy:document.querySelector('input[name=pack_strategy]:checked').value,qty,mix:Object.fromEntries(Object.keys(qty).map(t=>[t,$('chk_'+t).checked])),settings:active,advanced:false,totalWeight,known,manual:!!weight};workerURL=URL.createObjectURL(new Blob([workerSource()],{type:'text/javascript'}));worker=new Worker(workerURL);worker.onmessage=({data})=>{if(data.progress)status(data.progress);if(data.error){stop();status(data.error,true);}if(data.done){stop();try{results={all:data.done,input};showResults();status('計算完成。');}catch(e){status(e.message,true);}}};worker.onerror=e=>{stop();status('背景運算失敗：'+e.message,true);};worker.postMessage(input);
+ }catch(e){stop();status(e.message,true);}};
+function showResults(){
+ const r=results.all[0];globalLayouts=r.layouts;
+ for(const id of ['resTotalCages','resTotalWeightLabel','cageDetailsList','truckDetailsList','resTotalCost']){
+  const n=r.nodes[id];if(n.innerHTML!==undefined)$(id).innerHTML=n.innerHTML;else $(id).innerText=n.innerText;
+ }
+ $('resultArea').style.display='block';
+ const orders=Object.entries(results.input.settings.parcels).filter(([id,p])=>results.input.qty[id]>0&&p.unloadOrder!=null).sort((a,b)=>a[1].unloadOrder-b[1].unloadOrder);
+ unloadResult.textContent=orders.length?'籠內卸貨順序：'+orders.map(([id,p])=>`${p.name}（第 ${p.unloadOrder} 批）`).join('、')+'。已檢查門向直線取貨與上下支撐的先後關係；未驗證實際防倒。':'未指定卸貨順序：目前只檢查空間與底部支撐，尚未檢查先卸貨物靠門。';
+}
+const layerBar=document.createElement('div');layerBar.className='ext-row';layerBar.id='ext-layer';layerBar.innerHTML='<button class="btn-small" id="ext-play">逐層播放</button><label>顯示層數 <input type="range" id="ext-layer-range" min="0" value="0"></label><span id="ext-layer-label"></span>';$('modal3d').querySelector('.canvas-container').after(layerBar);
+let levels=[];function showLayer(){let count=Number($('ext-layer-range').value);avalancheBoxes.forEach(o=>{let y=o.mesh.position.y-o.mesh.geometry.parameters.height/2;let on=count>0&&y<=levels[count-1]+1;for(const object of [o.mesh,o.group]){object.visible=on;if(!object.userData.layerRaycast)object.userData.layerRaycast=object.raycast;object.raycast=on?object.userData.layerRaycast:()=>{};}});$('ext-layer-label').textContent=`${count} / ${levels.length} 層`;}
+function clearLayer(){clearInterval(layerTimer);layerTimer=null;$('ext-play').textContent='逐層播放';}
+const oldCage=openCage3D,oldTruck=openTruck3D,oldClose=close3D;
+function disposeScene(){clearLayer();if(animationId)cancelAnimationFrame(animationId);if(controls)controls.dispose();if(scene)scene.traverse(o=>{o.geometry?.dispose();if(o.material){for(const m of Array.isArray(o.material)?o.material:[o.material]){m.map?.dispose();m.dispose();}}});if(renderer)renderer.dispose();}
+openCage3D=function(key,title){disposeScene();oldCage(key,title);layerBar.hidden=false;layerBar.style.display='flex';levels=[...new Set(globalLayouts[key].map(b=>b.y))].sort((a,b)=>a-b);$('ext-layer-range').max=levels.length;$('ext-layer-range').value=levels.length;showLayer();};
+openTruck3D=function(...args){disposeScene();layerBar.style.display='none';oldTruck(...args);};close3D=function(){disposeScene();oldClose();};
+$('ext-layer-range').oninput=()=>{clearLayer();showLayer();};$('ext-play').onclick=()=>{if(layerTimer){clearLayer();return;}$('ext-layer-range').value=0;showLayer();$('ext-play').textContent='暫停';layerTimer=setInterval(()=>{$('ext-layer-range').value=Number($('ext-layer-range').value)+1;showLayer();if(Number($('ext-layer-range').value)>=levels.length)clearLayer();},700);};
+const oldReset=resetForm;resetForm=function(){if(worker){stop();}oldReset();invalidate();status('件數已清空。');};
+document.querySelectorAll('.grid-cards input,.strategy-container input,#total_weight_input').forEach(el=>el.addEventListener('input',invalidate));
+// Select the existing quantity on entry so typing replaces the default zero.
+document.querySelectorAll('.grid-cards input').forEach(input=>{
+ input.inputMode='numeric';input.step='1';input.autocomplete='off';
+ let selectOnClick=false;
+ input.addEventListener('focus',()=>{input.select();selectOnClick=true;});
+ input.addEventListener('click',()=>{if(selectOnClick){input.select();selectOnClick=false;}});
+ input.addEventListener('blur',()=>{selectOnClick=false;});
+});
+
+// Expose pure helpers only to a local verification harness.
+window.logisticsExtension={advancedPack,workerSource,defaults};
+})();
+
+
+</script>
+<script>
+(() => {
+ const originalScene=initTruckScene;
+ const viewBar=document.createElement('div');viewBar.className='ext-row';viewBar.hidden=true;viewBar.setAttribute('aria-label','貨車快速視角');
+ document.getElementById('canvas3d').closest('.canvas-container').after(viewBar);
+ let frame=null;
+ for(const [key,label] of [['default','立體'],['front','車頭'],['side','側面'],['rear','車尾'],['top','俯視']]){
+  const button=document.createElement('button');button.className='btn-small';button.textContent=label;button.dataset.view=key;
+  button.onclick=()=>{if(!frame)return;const {target,distance}=frame;const shift=truckGroup.position.clone();const center=target.clone().add(shift);const direction={default:[-.86,.48,-1],front:[0,.12,-1],side:[-1,.15,0],rear:[0,.12,1],top:[0,1,.001]}[key];camera.position.copy(center).add(new THREE.Vector3(...direction).normalize().multiplyScalar(distance));controls.target.copy(center);controls.update();};viewBar.append(button);
+ }
+ const previousCage=openCage3D;openCage3D=function(...args){viewBar.hidden=true;previousCage(...args);};
+ initTruckScene=function(truck,cagesLoaded){
+  viewBar.hidden=false;
+  originalScene(truck,cagesLoaded);
+  const cab=new THREE.Group();cab.name='detailed-cab';truckGroup.add(cab);
+  const large=truck.id==='35T',w=truck.w*.94,depth=large?265:truck.id==='3T'?155:205;
+  const cx=truck.w/2,front=-depth-18,back=-18,roof=large?330:truck.id==='3T'?255:290;
+  const material=(color,roughness=.4,metalness=.15)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+  const paint=material(isGoldenTheme?0xeab308:0xf4f7fb,.28,.3),blue=material(isGoldenTheme?0x925710:0x153d78),rubber=material(0x17212e,.85),chrome=material(0xa9b6c8,.24,.8);
+  const glass=material(0x24475d,.15,.55),light=material(0xf5f5dc,.15),amber=material(0xf59e0b,.3);
+  light.emissive=new THREE.Color(0xfff1c1);light.emissiveIntensity=.25;
+  function box(name,width,height,length,x,y,z,mat,bevel=0){let geo;
+   if(bevel){const shape=new THREE.Shape();shape.moveTo(-width/2+bevel,-height/2);shape.lineTo(width/2-bevel,-height/2);shape.quadraticCurveTo(width/2,-height/2,width/2,-height/2+bevel);shape.lineTo(width/2,height/2-bevel);shape.quadraticCurveTo(width/2,height/2,width/2-bevel,height/2);shape.lineTo(-width/2+bevel,height/2);shape.quadraticCurveTo(-width/2,height/2,-width/2,height/2-bevel);shape.lineTo(-width/2,-height/2+bevel);shape.quadraticCurveTo(-width/2,-height/2,-width/2+bevel,-height/2);geo=new THREE.ExtrudeGeometry(shape,{depth:length-2*bevel,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel*.4,bevelSegments:3,steps:1,curveSegments:6});geo.translate(0,0,-length/2+bevel);}
+   else geo=new THREE.BoxGeometry(width,height,length);
+   const mesh=new THREE.Mesh(geo,mat);mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;cab.add(mesh);return mesh;
+  }
+  function rod(name,a,b,r,mat){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),delta=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CylinderGeometry(r,r,delta.length(),10),mat);mesh.name=name;mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());cab.add(mesh);return mesh;}
+  const center=(front+back)/2;
+  box('cab-chassis',w*.8,20,depth+40,cx,77,center,rubber);
+  box('cab-lower',w,100,depth,cx,135,center,paint,8);
+  box('cab-upper',w*.96,roof-175,depth*.88,cx,(roof+175)/2,back-depth*.44,paint,8);
+  box('roof-cap',w*.99,14,depth*.9,cx,roof+4,back-depth*.44,paint,5);
+  const windowFront=back-depth*.88-5;
+  box('windshield-gasket',w*.86,(roof-175)*.64+8,5,cx,roof-(roof-175)*.4,windowFront,rubber,2);
+  box('windshield',w*.81,(roof-175)*.64,6,cx,roof-(roof-175)*.4,windowFront-3,glass,2);
+  box('windshield-divider',3,(roof-175)*.65,3,cx,roof-(roof-175)*.4,windowFront-7,rubber);
+  for(const sign of [-1,1]){
+   const x=cx+sign*w*.486;
+   box('side-window-frame',4,(roof-175)*.65+6,depth*.61,x,roof-(roof-175)*.4,back-depth*.48,rubber,1);
+   box('side-window',5,(roof-175)*.65,depth*.57,x+sign*2,roof-(roof-175)*.4,back-depth*.48,glass,1);
+   box('door-handle',6,5,22,x+sign*4,171,back-depth*.2,chrome,1);
+   box('side-blue-stripe',4,24,depth*.92,x+sign*3,146,center,blue);
+   box('entry-step',18,9,depth*.42,x+sign*5,88,back-depth*.32,chrome,2);
+   rod('mirror-arm',[x,roof-48,windowFront+15],[x+sign*28,roof-55,windowFront-18],3,rubber);
+   box('mirror-housing',15,39,17,x+sign*31,roof-64,windowFront-18,rubber,3);
+   box('mirror-glass',11,31,2,x+sign*31,roof-64,windowFront-8,chrome,1);
+   box('headlight',w*.2,17,6,cx+sign*w*.34,111,front-6,light,2);
+   box('turn-indicator',w*.08,9,7,cx+sign*w*.43,133,front-6,amber,1);
+   rod('wiper',[cx+sign*w*.08,roof-(roof-175)*.68,windowFront-8],[cx+sign*w*.31,roof-(roof-175)*.5,windowFront-8],1.6,rubber);
+  }
+  box('front-blue-panel',w*.92,29,5,cx,152,front-5,blue,2);
+  box('bumper',w+8,22,18,cx,83,front-5,rubber,4);
+  box('grille',w*.43,35,7,cx,112,front-7,rubber,2);
+  for(let i=0;i<4;i++)box('grille-slat',w*.39,2,3,cx,100+i*8,front-12,chrome);
+  box('plate',34,12,3,cx,82,front-16,paint,1);
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle=isGoldenTheme?'#925710':'#153d78';ctx.fillRect(0,0,512,128);ctx.fillStyle='#ffffff';ctx.textAlign='center';ctx.font='bold 66px sans-serif';ctx.fillText('宅配通',256,88);
+  const logo=new THREE.Mesh(new THREE.PlaneGeometry(w*.44,22),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas)}));logo.rotation.y=Math.PI;logo.position.set(cx,152,front-9);logo.userData={isLogo:true};cab.add(logo);
+  if(large){box('sleeper-section',w*.96,roof-100,62,cx,(roof+100)/2,back+25,paint,6);box('roof-fairing',w*.86,30,depth*.55,cx,roof+23,back-depth*.2,paint,8);}
+  // Reuse the original animated front wheels and click targets under the cab.
+  for(const child of truckGroup.children){if(child!==cab&&child.type==='Group'&&Math.abs(child.position.z-60)<.01&&Math.abs(child.rotation.z-Math.PI/2)<.01)child.position.z=front+depth*.38;}
+  // Contact shadow travels with the truck when the departure animation runs.
+  const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;const sc=shadowCanvas.getContext('2d');const gradient=sc.createRadialGradient(64,128,5,64,128,125);gradient.addColorStop(0,'rgba(15,23,42,.30)');gradient.addColorStop(1,'rgba(15,23,42,0)');sc.fillStyle=gradient;sc.fillRect(0,0,128,256);
+  const shadow=new THREE.Mesh(new THREE.PlaneGeometry(truck.w*2.1,(truck.l+depth)*1.3),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.set(cx,.5,(truck.l+front)/2);truckGroup.add(shadow);
+  scene.add(new THREE.HemisphereLight(0xe8f3ff,0x667085,.6));renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  const target=new THREE.Vector3(cx,roof*.5,(truck.l+front)/2),length=truck.l-front;
+  const distance=Math.max(length,truck.w*2)/ (2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)))*1.35/Math.min(camera.aspect,1);
+  camera.far=Math.max(6000,distance*4);camera.position.copy(target).add(new THREE.Vector3(-.86,.48,-1).normalize().multiplyScalar(distance));camera.updateProjectionMatrix();controls.target.copy(target);controls.maxDistance=distance*2.5;controls.minDistance=truck.w*.8;controls.update();
+  frame={target,distance};viewBar.hidden=false;
+  document.getElementById('modalTitle').textContent=truck.name+' — 車頭與車廂 3D';
+ };
+})();
+
+</script>
+</body>
+</html>
